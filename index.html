@@ -309,10 +309,10 @@ $('content').addEventListener('click',e=>{
   const k=S.cycle+'|'+b.dataset.open; S.open[k]=!S.open[k]; render();
 });
 let armT=null;
-function disarm(){clearTimeout(armT);$('clear').classList.remove('armed');$('clear').textContent='Clear checks'}
+function disarm(){clearTimeout(armT);$('clear').classList.remove('armed');$('clear').textContent='Clear ✓'}
 $('clear').onclick=()=>{
   const b=$('clear');
-  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='Tap again to clear Cycle '+S.cycle; armT=setTimeout(disarm,3500); return; }
+  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='Tap again to clear ✓'; armT=setTimeout(disarm,3500); return; }
   S.checks[String(S.cycle)]={}; disarm(); render(); queueSave();
 };
 $('lg').innerHTML=TIERS.map(t=>`<span><span class="tier t-${t}">${t}</span>${TNAME[t]}</span>`).join('');
