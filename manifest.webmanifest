@@ -1,7 +1,7 @@
 {
   "name": "Droid Rebirth Tracker",
-  "short_name": "Droid Tracker",
-  "description": "Rebirth planner for Droid Tycoon",
+  "short_name": "Rebirth Tracker",
+  "description": "Rebirth tracker for Droid Tycoon",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
