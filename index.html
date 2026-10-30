@@ -265,7 +265,7 @@ function detail(r,T){
   return h;
 }
 function renderGrid(shown,T,c){
-  const cols=Math.min(40,Math.max(T,10));
+  const cols=Math.min(40,T);
   let h='<div class="gridwrap"><table class="grid"><thead><tr><th class="c1">Droid</th><th class="c2">Target</th>';
   for(let i=1;i<=cols;i++)h+=`<th>${i}</th>`;
   h+='</tr></thead><tbody>';
