@@ -164,7 +164,7 @@ footer{margin-top:18px;color:var(--muted);font-size:12px}
       <button id="vRb" aria-pressed="false">By RB</button>
     </div>
     <button class="tog" id="hideDone" type="button" aria-pressed="false">Hide done</button>
-    <button class="clear" id="clear">Clear ✓</button>
+    <button class="clear" id="clear" aria-label="Clear checks">Clear ✓</button>
   </div>
   <div class="prog"><span id="progTxt"></span><i><s id="progBar"></s></i></div>
 
@@ -188,12 +188,12 @@ const RCOL={Common:'var(--r-common)',Rare:'var(--r-rare)',Epic:'var(--r-epic)',L
 const $=id=>document.getElementById(id);
 
 // ---- state (saved per viewer) ----
-let S={cycle:1,target:40,view:'list',hideDone:false,open:{},checks:{}};
+let S={cycle:1,target:40,view:'list',hideDone:false,open:{},checks:{},rbChecks:{}};
 const LS='droid-rebirth-tracker-v1';
 let touched=false, ref=null, saveTimer=null, saving=false, again=false, where='device';
 function lsRead(){try{const v=localStorage.getItem(LS);return v?JSON.parse(v):null}catch(e){return null}}
 function lsWrite(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
-function merge(o){ if(!o||typeof o!=='object')return; for(const k of ['cycle','target','view','hideDone','checks']) if(o[k]!==undefined) S[k]=o[k]; }
+function merge(o){ if(!o||typeof o!=='object')return; for(const k of ['cycle','target','view','hideDone','checks','rbChecks']) if(o[k]!==undefined) S[k]=o[k]; }
 function setSave(t){$('save').textContent=t}
 function queueSave(){
   touched=true; lsWrite();
@@ -203,7 +203,7 @@ function queueSave(){
 async function flush(){
   if(saving){again=true;return}
   saving=true;
-  try{ await ref.set({cycle:S.cycle,target:S.target,view:S.view,hideDone:S.hideDone,checks:S.checks}); setSave('Saved to your account'); }
+  try{ await ref.set({cycle:S.cycle,target:S.target,view:S.view,hideDone:S.hideDone,checks:S.checks,rbChecks:S.rbChecks}); setSave('Saved to your account'); }
   catch(e){ setSave('Saved on this device only'); }
   saving=false; if(again){again=false;flush()}
 }
@@ -222,6 +222,7 @@ function tierChip(a){return `<span class="tier t-${TIERS[a.top-1]}">${TIERS[a.to
 
 // ---- rendering ----
 function chk(c,name){return !!(S.checks[c]&&S.checks[c][name])}
+function rchk(c,rb,name){const m=S.rbChecks&&S.rbChecks[c];return !!(m&&m[rb+'|'+name])}
 function render(){
   const c=String(S.cycle), T=Math.max(1,Math.min(40,S.target|0||1));
   S.target=T;
@@ -234,9 +235,10 @@ function render(){
 
   const rows=[];
   for(const [name,rar,g] of sorted(c)){ const a=analyze(g,T); if(a.top) rows.push({name,rar,g,a,done:chk(c,name)}); }
-  const doneN=rows.filter(r=>r.done).length;
-  $('progTxt').textContent=`${doneN} of ${rows.length} droids done`; $('hideDone').textContent=doneN?`Hide done (${doneN})`:'Hide done';
-  $('progBar').style.width=rows.length?(100*doneN/rows.length)+'%':'0';
+  let doneN=rows.filter(r=>r.done).length, totalN=rows.length, unit='droids';
+  if(S.view==='rb'){ doneN=0; totalN=0; unit='steps'; for(let rb=1;rb<=T;rb++) for(const n of DATA.order[c][rb-1]){ totalN++; if(rchk(c,rb,n)) doneN++; } }
+  $('progTxt').textContent=`${doneN} of ${totalN} ${unit} done`; $('hideDone').textContent=doneN?`Hide done (${doneN})`:'Hide done';
+  $('progBar').style.width=totalN?(100*doneN/totalN)+'%':'0';
   const shown=S.hideDone?rows.filter(r=>!r.done):rows;
   $('content').innerHTML = S.view==='list'?renderList(shown,T,c,rows):S.view==='grid'?renderGrid(shown,T,c):renderByRb(T,c);
   if(!shown.length&&S.view!=='rb') $('content').innerHTML='<p class="note">Everything needed up to rebirth '+T+' is checked off.</p>';
@@ -283,7 +285,7 @@ function renderByRb(T,c){
   const byName={}; DATA.cycles[c].forEach(([n,r,g])=>byName[n]={r,g});
   let h='',any=false;
   for(let rb=1;rb<=T;rb++){
-    let items=DATA.order[c][rb-1].map(n=>({n,v:byName[n].g[rb-1],r:byName[n].r,done:chk(c,n)}));
+    let items=DATA.order[c][rb-1].map(n=>({n,v:byName[n].g[rb-1],r:byName[n].r,done:rchk(c,rb,n)}));
     const left=items.filter(x=>!x.done).length;
     if(S.hideDone) items=items.filter(x=>!x.done);
     if(!items.length) continue; any=true;
@@ -291,7 +293,7 @@ function renderByRb(T,c){
     for(const x of items){
       const g=byName[x.n].g; let lat='';
       for(let i=rb;i<40;i++){ if(g[i]) lat+=`<span class="${i+1>T?'later':''}">${lat?', ':''}<span class="tier t-${g[i]}">${g[i]}</span> at RB ${i+1}</span>`; }
-      h+=`<li class="${x.done?'done':''}" style="--rc:${RCOL[x.r]}"><label><input type="checkbox" data-chk="${esc(x.n)}"${x.done?' checked':''} aria-label="Have ${esc(x.n)}"><span class="dname">${esc(x.n)}${lat?`<span class="lnote">Needed again: ${lat}</span>`:''}</span><span class="tier t-${x.v}">${x.v}</span></label></li>`;
+      h+=`<li class="${x.done?'done':''}" style="--rc:${RCOL[x.r]}"><label><input type="checkbox" data-rbchk="${rb}|${esc(x.n)}"${x.done?' checked':''} aria-label="Have ${esc(x.n)}"><span class="dname">${esc(x.n)}${lat?`<span class="lnote">Needed again: ${lat}</span>`:''}</span><span class="tier t-${x.v}">${x.v}</span></label></li>`;
     }
     h+='</ul></section>';
   }
@@ -311,6 +313,9 @@ $('tnum').addEventListener('blur',()=>{ $('tnum').value=S.target; });
 $('vList').onclick=()=>{S.view='list';render();queueSave()}; $('vGrid').onclick=()=>{S.view='grid';render();queueSave()}; $('vRb').onclick=()=>{S.view='rb';render();queueSave()};
 $('hideDone').addEventListener('click',()=>{S.hideDone=!S.hideDone;render();queueSave()});
 $('content').addEventListener('change',e=>{
+  const rk=e.target.dataset&&e.target.dataset.rbchk;
+  if(rk!==undefined){ const c=String(S.cycle); S.rbChecks=S.rbChecks||{}; S.rbChecks[c]=S.rbChecks[c]||{};
+    if(e.target.checked)S.rbChecks[c][rk]=1; else delete S.rbChecks[c][rk]; render(); queueSave(); return; }
   const n=e.target.dataset&&e.target.dataset.chk; if(n===undefined)return;
   const c=String(S.cycle); S.checks[c]=S.checks[c]||{};
   if(e.target.checked)S.checks[c][n]=1; else delete S.checks[c][n];
@@ -324,8 +329,8 @@ let armT=null;
 function disarm(){clearTimeout(armT);$('clear').classList.remove('armed');$('clear').textContent='Clear ✓'}
 $('clear').onclick=()=>{
   const b=$('clear');
-  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='Tap again to clear ✓'; armT=setTimeout(disarm,3500); return; }
-  S.checks[String(S.cycle)]={}; disarm(); render(); queueSave();
+  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='Tap again to clear Cycle '+S.cycle; armT=setTimeout(disarm,3500); return; }
+  S.checks[String(S.cycle)]={}; if(S.rbChecks)S.rbChecks[String(S.cycle)]={}; disarm(); render(); queueSave();
 };
 $('lg').innerHTML=TIERS.map(t=>`<span><span class="tier t-${t}">${t}</span>${TNAME[t]}</span>`).join('');
 
